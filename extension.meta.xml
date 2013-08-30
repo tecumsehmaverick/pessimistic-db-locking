@@ -7,11 +7,11 @@
 	</types>
 	<authors>
 		<author>
-			<name github="symphonists" symphony="community">Symphony Community</name>
+			<name github="scottkf" symphony="scottkf">Scott Tesoriere</name>
 		</author>
 	</authors>
 	<releases>
-		<release version="0.2" date="2012-06-05" min="2.3.3">
+		<release version="0.6" date="2013-08-30" min="2.3.3">
 			- Update for Symphony 2.3
 		</release>
 	</releases>
