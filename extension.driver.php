@@ -35,7 +35,7 @@
 		
 
    public function install() {
-      $this->_Parent->Database->query("
+      return Symphony::Database()->query("
         CREATE TABLE IF NOT EXISTS `tbl_db_locking` (
           `id` int(11) unsigned NOT NULL auto_increment,
 					`entry_id` int(11) unsigned NOT NULL,
@@ -45,89 +45,89 @@
           PRIMARY KEY (`id`),
 					KEY `entry_id` (`entry_id`),
 					KEY `user_id` (`user_id`)
-        )
-      ");
-		}
+        ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;");
+	}
 
     public function uninstall() {
-      $this->_Parent->Database->query("DROP TABLE `tbl_db_locking`");
+      return Symphony::Database()->query("DROP TABLE `tbl_db_locking`");
     }
 		
-		public function getSubscribedDelegates() {
-			return array(
-				array(
-					'page'		=> '/backend/',
-					'delegate'	=> 'InitaliseAdminPageHead',
-					'callback'	=> 'initaliseAdminPageHead'
-				),
-				array(
-					'page'		=> '/backend/',
-					'delegate'	=>	'AppendPageAlert',
-					'callback'	=>	'appendPageAlert'
-				),
-				array(
-          'page'    => '/blueprints/events/edit/',
-          'delegate'  => 'AppendEventFilter',
-          'callback'  => 'appendEventFilter'
-        ),        
-        array(
-          'page'    => '/blueprints/events/new/',
-          'delegate'  => 'AppendEventFilter',
-          'callback'  => 'appendEventFilter'
-        ),
-	      array(
-	        'page' => '/blueprints/events/new/',
-	        'delegate' => 'AppendEventFilterDocumentation',
-	        'callback' => 'appendEventFilterDocumentation'
-	      ),
-	      array(
-	        'page' => '/blueprints/events/edit/',
-	        'delegate' => 'AppendEventFilterDocumentation',
-	        'callback' => 'appendEventFilterDocumentation'
-	      ),
-				array(
-          'page'    => '/frontend/',
-          'delegate'  => 'EventPreSaveFilter',
-          'callback'  => 'eventPreSave'
-        ),
-				array(
-        'page'    => '/frontend/',
-        'delegate'  => 'EventPostSaveFilter',
-        'callback'  => 'eventPostSave'
-      ),
+	public function getSubscribedDelegates() {
+		return array(
 			array(
-	      'page'    => '/frontend/',
-	      'delegate'  => 'FrontendProcessEvents',
-	      'callback'  => 'preInjectXML'
-	    ),
+				'page'		=> '/backend/',
+				'delegate'	=> 'InitaliseAdminPageHead',
+				'callback'	=> 'initaliseAdminPageHead'
+			),
 			array(
-	      'page'    => '/frontend/',
-	      'delegate'  => 'FrontendEventPostProcess',
-	      'callback'  => 'injectXML'
-	    ),
+				'page'		=> '/backend/',
+				'delegate'	=>	'AppendPageAlert',
+				'callback'	=>	'appendPageAlert'
+			),
+			array(
+				'page'    => '/blueprints/events/edit/',
+				'delegate'  => 'AppendEventFilter',
+				'callback'  => 'appendEventFilter'
+			),        
+			array(
+				'page'    => '/blueprints/events/new/',
+				'delegate'  => 'AppendEventFilter',
+				'callback'  => 'appendEventFilter'
+			),
+			array(
+				'page' => '/blueprints/events/new/',
+				'delegate' => 'AppendEventFilterDocumentation',
+				'callback' => 'appendEventFilterDocumentation'
+			),
+			array(
+				'page' => '/blueprints/events/edit/',
+				'delegate' => 'AppendEventFilterDocumentation',
+				'callback' => 'appendEventFilterDocumentation'
+			),
+			array(
+				'page'    => '/frontend/',
+				'delegate'  => 'EventPreSaveFilter',
+				'callback'  => 'eventPreSave'
+			),
+			array(
+				'page'    => '/frontend/',
+				'delegate'  => 'EventPostSaveFilter',
+				'callback'  => 'eventPostSave'
+			),
+			array(
+				'page'    => '/frontend/',
+				'delegate'  => 'FrontendProcessEvents',
+				'callback'  => 'preInjectXML'
+			),
+			array(
+				'page'    => '/frontend/',
+				'delegate'  => 'FrontendEventPostProcess',
+				'callback'  => 'injectXML'
+			),
 			array(
 				'page'		=> '/publish/edit/',
 				'delegate'	=> 'EntryPostEdit',
 				'callback'	=> 'entryPostSave'
 			)
 			);
-		}
+	}
 		
 	/*-------------------------------------------------------------------------
 		Delegates:
 	-------------------------------------------------------------------------*/
 		
-		public function initaliseAdminPageHead($context) {
-			$page = $context['parent']->Page;
-			
+	public function initaliseAdminPageHead($context) {
+			$page = Administration::instance()->Page;
+			$pageContent = $page->getContext();
+
 			// only include the element if you're on the symphony /publish/*/edit page
-      if ($page instanceof contentPublish and $page->_context['page'] == 'edit') {      
+      if ($page instanceof contentPublish and $pageContent['page'] == 'edit') {      
 				$page->addStylesheetToHead(URL . '/extensions/pessimistic_db_locking/assets/locking.css', 'screen', 1003);
 				$page->addScriptToHead(URL . '/extensions/pessimistic_db_locking/assets/locking.js', 1004);
 
 				if (1) {
-					$author_id = $this->_Parent->Author->get('id');
-					$entry_id = $page->_context['entry_id'];
+					$author_id = Administration::instance()->Author->get('id');
+					$entry_id = $pageContent['entry_id'];
 					// if the lock doesn't exist (or is expired)
 					if (($lock = $this->lockExists($entry_id)) <= 0) {
 						// add js to renew lock
@@ -153,14 +153,16 @@
 		}			
 		
 		public function appendPageAlert(&$context) {
-			$page = $context['parent']->Page;
+			$page = Administration::instance()->Page;
+			$pageContent = $page->getContext();
 			// if the entry is locked, 
 			// 	let the user know (so long as it's not the same user and the lock isn't expired)
 			if ($this->locked[0] == true) {
-		    $authorManager = new AuthorManager($this->_Parent);
+		    $authorManager = new AuthorManager();
 		    $authors = $authorManager->fetchByID($this->locked[1]);
 				$time_left = (strtotime($this->locked[3]) + $this->expire_lock) - time();
-				Administration::instance()->Page->pageAlert(__($authors->getFullName().' is already editing this entry! Please try again in <strong>'.$time_left.'</strong> seconds.'), Alert::ERROR);
+				//Add moment.js library for a count down and page refresh notification?
+				Administration::instance()->Page->pageAlert(__($authors->getFullName().' is already editing this entry! Please try again in <strong>'.$time_left.'</strong> seconds. <a href="'.URL.'/symphony/publish/'.$pageContent['section_handle'].'/'.$pageContent['page'].'/'.$pageContent['entry_id'].'">Refresh</a> to check again.'), Alert::ERROR);
 			}
 		}
 		
@@ -173,7 +175,7 @@
 		}
 
 		public function preInjectXML($context) {
-			$EventManager = new EventManager($this->_Parent);
+			$EventManager = new EventManager();
 			// we have to load the events twice to look for a lock-entry event attached
 			if(strlen(trim($context['events'])) > 0) {
 				$events = preg_split('/,\s*/i', $context['events'], -1, PREG_SPLIT_NO_EMPTY);
@@ -305,7 +307,7 @@ CODE;
 				} else {
 					// the lock exists, see if it's owned by the user
 					if ($lock[0] != $author_id) {
-				    $authorManager = new AuthorManager($this->_Parent);
+				    $authorManager = new AuthorManager();
 				    $authors = $authorManager->fetchByID($this->locked[1]);
 						$context['messages'] = array(array('lock-entry', 'failed', 'This lease is currently owned by '.$authors->getFullName().'.'));
 					}
@@ -320,7 +322,7 @@ CODE;
 			$event = $context['event'];
 		 	if (in_array("lock-entry", $event->eParamFILTERS)) {
 				if (!isset($_POST['id'])) {
-					; //change $context['message']
+					 //change $context['message']
 					return;
 				} else {
 					$entry_id = $_POST['id'];
@@ -328,7 +330,7 @@ CODE;
 
 				// remove a lock
 				$this->removeTheLockByEntry($entry_id);
-				;
+				
       }
 		}
 
@@ -358,7 +360,7 @@ CODE;
 		public function lockExists($entry_id) {
 			if (!$entry_id) return -2;
 			$this->lockTables('READ');
-			$lock = $this->_Parent->Database->fetch("
+			$lock = Symphony::Database()->fetch("
 				SELECT `user_id`, `time_opened`, `id` , `time_updated`
 				FROM `tbl_db_locking`  
 				WHERE `entry_id` = '".$entry_id."'
@@ -382,7 +384,7 @@ CODE;
 		
 		public function removeTheLockByEntry($entry_id) {
 			$this->lockTables('WRITE');
-			$this->_Parent->Database->query("
+			Symphony::Database()->query("
 				DELETE QUICK FROM
 				`tbl_db_locking`
 				WHERE 
@@ -395,7 +397,7 @@ CODE;
 		protected function fetchTheLock($entry_id, $user_id) {
 			if (!$entry_id) return -2;
 			$this->lockTables('READ');
-			$lock = $this->_Parent->Database->fetch("
+			$lock = Symphony::Database()->fetch("
 				SELECT `entry_id`, `user_id`, `time_opened`, `id`, `time_updated`
 				FROM `tbl_db_locking`  
 				WHERE `entry_id` = '".$entry_id."' AND `user_id` = '".$user_id."'
@@ -409,7 +411,7 @@ CODE;
 		protected function removeTheLock($id) {
 			if ($id == '') return;
 			$this->lockTables('WRITE');
-			$this->_Parent->Database->query("
+			Symphony::Database()->query("
 				DELETE QUICK FROM
 				`tbl_db_locking`
 				WHERE 
@@ -422,7 +424,7 @@ CODE;
 		protected function updateTheLock($entry_id, $user_id, $id) {
 			if (!$entry_id) return -2;
 			$this->lockTables('WRITE');
-			$this->_Parent->Database->query("
+			Symphony::Database()->query("
 				UPDATE
 				`tbl_db_locking`
 				SET
@@ -437,7 +439,7 @@ CODE;
 
 		protected function addTheLock($entry_id, $user_id) {
 			$this->lockTables('WRITE');
-			$this->_Parent->Database->query("
+			Symphony::Database()->query("
 				INSERT INTO
 				`tbl_db_locking`
 				SET
@@ -450,13 +452,13 @@ CODE;
 
 
 		protected function lockTables($method) {
-			$this->_Parent->Database->query("
+			return Symphony::Database()->query("
 				LOCK TABLES `tbl_db_locking` {$method}
 			");
 		}
 		
 		protected function unlockTables() {
-			$this->_Parent->Database->query("
+			return Symphony::Database()->query("
 				UNLOCK TABLES
 			");
 		}

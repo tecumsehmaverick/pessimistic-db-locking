@@ -7,9 +7,9 @@
 	class ContentExtensionPessimistic_DB_LockingAjax_Locking extends AdministrationPage {
 		protected $_driver = null;
 		
-		public function __construct(&$parent){
-			parent::__construct($parent);
-			$this->_driver = $this->_Parent->ExtensionManager->create('pessimistic_db_locking');
+		public function __construct(){
+			parent::__construct();
+			$this->_driver = Symphony::ExtensionManager()->create('pessimistic_db_locking');
 		}
 		
 		public function __viewIndex() {
@@ -34,7 +34,7 @@
 			$lock = $this->_driver->lockExists($entry_id);
 			if ($author_id != $lock[0] && $lock[0] > 0) {
 
-		    $authorManager = new AuthorManager($this->_Parent);
+		    $authorManager = new AuthorManager();
 				$author = $authorManager->fetchByID($lock[0]);
 				echo json_encode($author->getFullName());
 			}
